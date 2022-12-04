@@ -1,0 +1,15 @@
+[features]
+seeds = false
+skip-lint = false
+[programs.localnet]
+anchor_nft_staking = "EEtnT4dQAVRj4uKkBND9fszGr4e2UM9Sd6TKF45VPy4"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "localnet"
+wallet = "/Users/saicharanpogul/Desktop/Practice/Solana/buildspace/buildspace.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
