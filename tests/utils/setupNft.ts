@@ -16,7 +16,7 @@ export const setupNft = async (
     .use(keypairIdentity(payer))
     .use(bundlrStorage());
   const nft = await metaplex.nfts().create({
-    name: "Test NFT",
+    name: "Element #1",
     uri: "",
     sellerFeeBasisPoints: 0,
   });

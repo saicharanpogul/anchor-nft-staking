@@ -8,8 +8,38 @@ use mpl_token_metadata::{
   instruction::{freeze_delegated_account, thaw_delegated_account},
   ID as MetadataTokenId,
 };
+use mpl_token_metadata::state::{Metadata as MetadataAccount, TokenMetadataAccount};
 
 declare_id!("EEtnT4dQAVRj4uKkBND9fszGr4e2UM9Sd6TKF45VPy4");
+
+pub fn get_blocks_arrays() -> ([u8; 15], [u8; 36], [u8; 40], [u8; 28]) {
+    let s = [1, 2, 3, 4, 11, 12, 19, 20, 37, 38, 55, 56, 87, 88, 119];
+    let p = [5, 6, 7, 8, 9, 10, 13, 14, 15, 16, 17, 18, 31, 32, 33, 34, 35, 36, 49, 50, 51, 52, 53, 54, 81, 82, 83, 84, 85, 86, 113, 114, 115, 116, 117, 118];
+    let d = [21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112];
+    let f = [57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102];
+
+    (s, p, d, f)
+}
+
+pub fn get_index(clock: &Clock, len: u8) -> usize {
+  let i: usize = (clock.unix_timestamp % i64::from(len)).try_into().unwrap();
+  i
+}
+
+pub fn get_block(atomic_number: u8) -> Option<(u8, u8)> {
+  let (s, p, d, f) = get_blocks_arrays();
+    if s.contains(&atomic_number) {
+        Some((10, s.len().try_into().unwrap()))
+    } else if p.contains(&atomic_number) {
+        Some((20, p.len().try_into().unwrap()))
+    } else if d.contains(&atomic_number) {
+        Some((30, d.len().try_into().unwrap()))
+    } else if f.contains(&atomic_number) {
+        Some((40, f.len().try_into().unwrap()))
+    } else {
+        None
+    }
+}
 
 #[program]
 pub mod anchor_nft_staking {
@@ -57,12 +87,44 @@ pub mod anchor_nft_staking {
     pub fn redeem(ctx: Context<Redeem>) -> Result<()> {
         require!(ctx.accounts.stake_state.is_initialized, StakeError::UninitializedAccount);
         require!(ctx.accounts.stake_state.stake_state == StakeState::Staked, StakeError::InvalidStakeState);
+        let metadata: MetadataAccount = MetadataAccount::from_account_info(&ctx.accounts.mint_metadata)?;
+        let name = &metadata.data.name;
+        let split = name.split('#');
+        let last = split.last().unwrap();
+        let trimmed = last.trim();
+        let num_str = trimmed.replace("\0", "");
+        require!(num_str.chars().all(|c| c.is_digit(10)), StakeError::InvalidElementName);
+        require!(num_str.len() > 0, StakeError::InvalidElementName);
+        let atomic_number = num_str.parse::<u8>().unwrap();
+        let (block, len) = get_block(atomic_number).unwrap();
+        let (s, p, d, f) = get_blocks_arrays();
         let clock = Clock::get()?;
+        let mut random = u8::MIN;
+        let mut i: usize = get_index(&clock, len);
+        if i == 0 {
+          i = 1
+        }
+        msg!("Block: {}, Length: {}, Index: {}", block, len, i);
+        if usize::from(len) == s.len() {
+            random = s[i - 1];
+            msg!("Random: {:?}", random);
+        } else if usize::from(len) == p.len() {
+            random = p[i - 1];
+            msg!("Random: {:?}", random);
+        } else if usize::from(len) == d.len() {
+            random =  d[i - 1];
+            msg!("Random: {:?}", random);
+        } else if usize::from(len) == f.len() {
+            random =  f[i - 1];
+            msg!("Random: {:?}", random);
+        } else {
+            return err!(StakeError::InvalidBlockData)
+        }
         msg!("Stake last redeem: {:?}", ctx.accounts.stake_state.last_stake_redeem);
         msg!("Current time: {:?}", clock.unix_timestamp);
         let unix_time = clock.unix_timestamp - ctx.accounts.stake_state.last_stake_redeem;
         msg!("Seconds since last redeem: {}", unix_time);
-        let redeem_amount = (10 * i64::pow(10, 2) * unix_time) / (24 * 60 * 60);
+        let redeem_amount = (10 * i64::pow(10, 2) * unix_time) / (24 * 60 * 60) * (i64::from(random) / i64::from(block));
         msg!("Eligible redeem amount: {}", redeem_amount);
         msg!("Minting staking rewards");
         token::mint_to(
@@ -84,6 +146,39 @@ pub mod anchor_nft_staking {
     pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
         require!(ctx.accounts.stake_state.is_initialized, StakeError::UninitializedAccount);
         require!(ctx.accounts.stake_state.stake_state == StakeState::Staked, StakeError::InvalidStakeState);
+        let metadata: MetadataAccount = MetadataAccount::from_account_info(&ctx.accounts.mint_metadata)?;
+        let name = &metadata.data.name;
+        let split = name.split('#');
+        let last = split.last().unwrap();
+        let trimmed = last.trim();
+        let num_str = trimmed.replace("\0", "");
+        require!(num_str.chars().all(|c| c.is_digit(10)), StakeError::InvalidElementName);
+        require!(num_str.len() > 0, StakeError::InvalidElementName);
+        let atomic_number = num_str.parse::<u8>().unwrap();
+        let (block, len) = get_block(atomic_number).unwrap();
+        let (s, p, d, f) = get_blocks_arrays();
+        let clock = Clock::get()?;
+        let mut random = u8::MIN;
+        let mut i: usize = get_index(&clock, len);
+        if i == 0 {
+          i = 1
+        }
+        msg!("Block: {}, Length: {}, Index: {}", block, len, i);
+        if usize::from(len) == s.len() {
+            random = s[i - 1];
+            msg!("Random: {:?}", random);
+        } else if usize::from(len) == p.len() {
+            random = p[i - 1];
+            msg!("Random: {:?}", random);
+        } else if usize::from(len) == d.len() {
+            random =  d[i - 1];
+            msg!("Random: {:?}", random);
+        } else if usize::from(len) == f.len() {
+            random =  f[i - 1];
+            msg!("Random: {:?}", random);
+        } else {
+            return err!(StakeError::InvalidBlockData)
+        }
         msg!("Thawing token account");
         let authority_bump = *ctx.bumps.get("program_authority").unwrap();
         invoke_signed(
@@ -115,7 +210,7 @@ pub mod anchor_nft_staking {
         msg!("Current time: {:?}", clock.unix_timestamp);
         let unix_time = clock.unix_timestamp - ctx.accounts.stake_state.last_stake_redeem;
         msg!("Seconds since last redeem: {}", unix_time);
-        let redeem_amount = (10 * i64::pow(10, 2) * unix_time) / (24 * 60 * 60);
+        let redeem_amount = (10 * i64::pow(10, 2) * unix_time) / (24 * 60 * 60) * (i64::from(random) / i64::from(block));
         msg!("Eligible redeem amount: {}", redeem_amount);
         msg!("Minting staking rewards");
         token::mint_to(
@@ -193,6 +288,8 @@ pub struct Redeem<'info> {
     associated_token::authority=user
   )]
   pub user_stake_ata: Account<'info, TokenAccount>,
+  /// CHECK: manual check
+  pub mint_metadata: AccountInfo<'info>,
   pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
   pub associated_token_program: Program<'info, AssociatedToken>,
@@ -231,7 +328,9 @@ pub struct Unstake<'info> {
     associated_token::mint=stake_mint,
     associated_token::authority=user
   )]
-  pub user_stake_ata: Account<'info, TokenAccount>,
+  pub user_stake_ata: Box<Account<'info, TokenAccount>>,
+  /// CHECK: manual check
+  pub mint_metadata: AccountInfo<'info>,
   pub token_program: Program<'info, Token>,
   pub system_program: Program<'info, System>,
   pub metadata_program: Program<'info, Metadata>,
@@ -278,4 +377,8 @@ pub enum  StakeError {
     UninitializedAccount,
     #[msg("Stake state is invalid")]
     InvalidStakeState,
+    #[msg("Invalid element name")]
+    InvalidElementName,
+    #[msg("Invalid block data")]
+    InvalidBlockData
 }

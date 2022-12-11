@@ -7,6 +7,8 @@ import { PROGRAM_ID as METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-toke
 import { assert, expect } from "chai";
 import { getAccount } from "@solana/spl-token";
 
+const sleep = (s: number) => new Promise((p) => setTimeout(() => {}, s * 1000));
+
 describe("anchor-nft-staking", () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
@@ -26,6 +28,11 @@ describe("anchor-nft-staking", () => {
   before(async () => {
     ({ nft, delegateAuthPda, stakeStatePda, mint, mintAuth, tokenAddress } =
       await setupNft(program, wallet.payer));
+  });
+
+  beforeEach(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 40000));
+    console.log("----------------------");
   });
 
   it("Stakes", async () => {
@@ -53,7 +60,7 @@ describe("anchor-nft-staking", () => {
 
   it("Redeems", async () => {
     try {
-      await program.methods
+      const sig = await program.methods
         .redeem()
         .accounts({
           nftTokenAccount: nft.tokenAddress,
@@ -62,11 +69,13 @@ describe("anchor-nft-staking", () => {
           user: wallet.publicKey,
           stakeAuthority: mintAuth,
           stakeState: stakeStatePda,
+          mintMetadata: nft.metadataAddress,
         })
         .rpc();
       const account = await program.account.userStakeInfo.fetch(stakeStatePda);
       console.log("After Redeeming", account);
       expect(account.stakeState === "Staked");
+      console.log("SIGNATURE:", sig);
       // const tokenAccount = await getAccount(provider.connection, tokenAddress);
       // console.log(tokenAccount);
     } catch (error) {
@@ -90,6 +99,7 @@ describe("anchor-nft-staking", () => {
           stakeAuthority: mintAuth,
           stakeState: stakeStatePda,
           programAuthority: delegateAuthPda,
+          mintMetadata: nft.metadataAddress,
         })
         .rpc();
       const account = await program.account.userStakeInfo.fetch(stakeStatePda);

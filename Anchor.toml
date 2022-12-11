@@ -1,14 +1,14 @@
 [features]
 seeds = false
 skip-lint = false
-[programs.localnet]
+[programs.devnet]
 anchor_nft_staking = "EEtnT4dQAVRj4uKkBND9fszGr4e2UM9Sd6TKF45VPy4"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "/Users/saicharanpogul/Desktop/Practice/Solana/buildspace/buildspace.json"
 
 [scripts]
