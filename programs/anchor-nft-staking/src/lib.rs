@@ -139,6 +139,7 @@ pub mod anchor_nft_staking {
             ]]), redeem_amount.try_into().unwrap())?;
 
         ctx.accounts.stake_state.last_stake_redeem = clock.unix_timestamp;
+        ctx.accounts.stake_state.total_earned += redeem_amount as u64;
         msg!("Updated last stake redeem time: {:?}", ctx.accounts.stake_state.last_stake_redeem);
         Ok(())
     }
@@ -225,6 +226,7 @@ pub mod anchor_nft_staking {
             ]]), redeem_amount.try_into().unwrap())?;
 
         ctx.accounts.stake_state.last_stake_redeem = clock.unix_timestamp;
+        ctx.accounts.stake_state.total_earned += redeem_amount as u64;
         msg!("Updated last stake redeem time: {:?}", ctx.accounts.stake_state.last_stake_redeem);
         ctx.accounts.stake_state.stake_state = StakeState::Unstaked;
         msg!("NFT Unstaked");
@@ -343,6 +345,7 @@ pub struct UserStakeInfo {
   pub token_account: Pubkey,
   pub stake_start_time: i64,
   pub last_stake_redeem: i64,
+  pub total_earned: u64,
   pub user_pubkey: Pubkey,
   pub stake_state: StakeState,
   pub is_initialized: bool,
